@@ -1,18 +1,25 @@
 {
   "name": "aframe-font-awesome",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "webpack index.js dist/aframe-font-awesome.js && webpack -p index.js dist/aframe-font-awesome.min.js",
+    "build": "webpack index.js -o dist/aframe-font-awesome.js && webpack -p index.js -o dist/aframe-font-awesome.min.js",
     "dev": "budo index.js:dist/aframe-font-awesome.min.js --port 7000 --live --open",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
+  "contributors": [
+    {
+      "name": "Thomas Mohr",
+      "url": "https://github.com/mohrtw/"
+    }
+  ],
   "license": "ISC",
-  "dependencies": {
+  "devDependencies": {
     "budo": "^10.0.4",
-    "uglifyjs-webpack-plugin": "^1.0.0-beta.1"
-  },
-  "devDependencies": {}
+    "uglifyjs-webpack-plugin": "^1.0.0-beta.1",
+    "webpack": "^4.41.2",
+    "webpack-cli": "^3.3.10"
+  }
 }

@@ -1,3 +1,6 @@
+var versions = ['FontAwesome', '"Font Awesome 5 Pro"',
+    '"Font Awesome 5 Free"', '"Font Awesome 5 Brands"'];
+
 AFRAME.registerSystem('font-awesome', {
     schema: {
         timeout: { type: 'number', default: 2500 }
@@ -8,6 +11,11 @@ AFRAME.registerSystem('font-awesome', {
 
     loaded: false,
     promise: null,
+
+    init() {
+        this.version = 'FontAwesome';
+        this.el.emit('font-awesome-system-initialized', {scene: this.sceneEl});
+    },
 
     draw: function(data) {
         const key = [data.charcode, data.color, data.size].join('-');
@@ -25,7 +33,8 @@ AFRAME.registerSystem('font-awesome', {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = data.color;
-            ctx.font= fontSize + 'px FontAwesome';
+            const fontWeight = data.version == '"Font Awesome 5 Brands"' ? 900 : 400;
+            ctx.font = fontWeight + ' ' + fontSize + 'px ' + data.version;
             ctx.fillText(String.fromCharCode('0x' + data.charcode),position,position);
 
             this.cache[key] = canvas.toDataURL();
@@ -34,12 +43,12 @@ AFRAME.registerSystem('font-awesome', {
         return this.cache[key];
     },
 
-    isStylesheetLoaded: function() {
+    isStylesheetLoaded: function(version='FontAwesome') {
         if(this.loaded) {
             return Promise.resolve();
         }
 
-        if(this.isFontAwesomeAvailable()) {
+        if(this.isFontAwesomeAvailable(version)) {
             this.onLoaded();
             return Promise.resolve();
         }
@@ -48,7 +57,7 @@ AFRAME.registerSystem('font-awesome', {
             this.promise = new Promise((resolve) => {
                 if(this.canCheckDocumentFonts()) {
                     const func = () => {
-                        if (this.isFontAwesomeAvailable()) {
+                        if (this.isFontAwesomeAvailable(version)) {
                             document.fonts.removeEventListener('loadingdone', func)
                             this.onLoaded(resolve);
                         }
@@ -68,8 +77,8 @@ AFRAME.registerSystem('font-awesome', {
         return this.promise;
     },
 
-    isFontAwesomeAvailable: function() {
-        return this.canCheckDocumentFonts() && document.fonts.check('1px FontAwesome');
+    isFontAwesomeAvailable: function(version='FontAwesome') {
+        return this.canCheckDocumentFonts() && document.fonts.check('1px ' + version);
     },
 
     canCheckDocumentFonts: function() {
@@ -83,26 +92,70 @@ AFRAME.registerSystem('font-awesome', {
         if(resolve) {
             resolve();
         }
+    },
+
+    setVersion(version) {
+        if (versions.includes(version)) {
+                this.version = version;
+            }
+        else {
+            console.warn(version + ' is not an available Font Awesome version.')
+        }
+    },
+
+    createMesh(iconDataURL, width) {
+        var map = THREE.ImageUtils.loadTexture(iconDataURL);
+        var geo = new THREE.PlaneBufferGeometry(width, width);
+        var mat = new THREE.MeshBasicMaterial({
+            map: map,
+            side: THREE.DoubleSide,
+            transparent: true,
+        });
+        return new THREE.Mesh(geo, mat);
     }
 });
 
 AFRAME.registerComponent('font-awesome', {
     schema: {
+        id: { type: 'string', default: '' },
         charcode: { type: 'string' },
         color: { default: '#000', type: 'string' },
         size: { default: '1024', type: 'number' },
+        fontSize: { type: 'number', default: 1 },
+        fontSizeConstant: { type: 'number', default: 0.02836 },
         visibleWhenDrawn: { default: 'true', 'type': 'boolean' },
+        mesh: { type: 'boolean', default: false },
+        version: { type: 'string', default: '', onOf: versions},
+    },
+
+    multiple: true,
+
+    init: function() {
+        if (this.data.version == '') {
+            this.data.version = this.system.version;
+        }
     },
 
     update: function() {
         if(this.data.visibleWhenDrawn) {
             this.el.setAttribute('visible', 'false');
         }
+        var width = this.data.fontSize * this.data.fontSizeConstant;
 
-        this.system.isStylesheetLoaded().then(function() {
-            const result = this.system.draw(this.data);
-            this.el.setAttribute('src', result);
-            this.el.emit('font-awesome.drawn');
+        this.system.isStylesheetLoaded(this.data.version).then(function() {
+            const iconDataURL = this.el.sceneEl.systems["font-awesome"].draw(this.data);
+
+            if (this.data.mesh) {
+                var mesh = this.system.createMesh(iconDataURL, width);
+                var meshName = this.data.id != '' ? 'fa-' + this.data.id : 'fa';
+                this.el.setObject3D(meshName, mesh);
+            }
+            else {
+                this.el.setAttribute('src', iconDataURL);
+                this.el.emit('font-awesome.drawn');
+            }
+            
+            this.el.emit('font-awesome.drawn', {id: this.data.id});
 
             if(this.data.visibleWhenDrawn) {
                 setTimeout(() => this.el.setAttribute('visible', 'true'));
@@ -117,11 +170,11 @@ AFRAME.registerPrimitive('a-font-awesome', {
         'material': { 'side': 'double', 'transparent': 'true' },
     },
 
-    // Maps HTML attributes to the `ocean` component's properties.
     mappings: {
         charcode: 'font-awesome.charcode',
         color: 'font-awesome.color',
         size: 'font-awesome.size',
         src: 'material.src',
+        version: 'font-awesome.version',
     }
 });
